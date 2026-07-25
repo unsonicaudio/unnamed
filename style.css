@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import mimetypes
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+class ObjectStore:
+    def __init__(self, data_dir: Path):
+        self.root = data_dir
+        self.objects = self.root / "objects"
+        self.manifests = self.root / "manifests"
+        self.vfs = self.root / "vfs"
+        for path in (self.objects, self.manifests, self.vfs):
+            path.mkdir(parents=True, exist_ok=True)
+
+    def import_file(self, source: Path) -> dict:
+        source = source.resolve()
+        if not source.is_file():
+            raise ValueError(f"Not a file: {source}")
+        digest = sha256_file(source)
+        destination = self.objects / digest
+        if not destination.exists():
+            shutil.copyfile(source, destination)
+        manifest = {
+            "vobj_version": "0.1",
+            "object_type": "file",
+            "id": f"sha256:{digest}",
+            "name": source.name,
+            "size": source.stat().st_size,
+            "mime": mimetypes.guess_type(source.name)[0] or "application/octet-stream",
+            "created": utc_now(),
+            "payload_hash": digest,
+        }
+        self._write_manifest(digest, manifest)
+        return manifest
+
+    def import_directory(self, source: Path) -> dict:
+        source = source.resolve()
+        if not source.is_dir():
+            raise ValueError(f"Not a directory: {source}")
+        entries = []
+        for path in sorted(p for p in source.rglob("*") if p.is_file()):
+            item = self.import_file(path)
+            entries.append({"path": path.relative_to(source).as_posix(), "hash": item["payload_hash"]})
+        canonical = json.dumps(entries, separators=(",", ":"), sort_keys=True).encode()
+        digest = hashlib.sha256(canonical).hexdigest()
+        manifest = {
+            "vobj_version": "0.1",
+            "object_type": "directory",
+            "id": f"sha256:{digest}",
+            "name": source.name,
+            "created": utc_now(),
+            "entries": entries,
+            "root_hash": digest,
+        }
+        self._write_manifest(digest, manifest)
+        return manifest
+
+    def import_path(self, source: Path) -> dict:
+        return self.import_directory(source) if source.is_dir() else self.import_file(source)
+
+    def _write_manifest(self, digest: str, manifest: dict) -> None:
+        (self.manifests / f"{digest}.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+    def list_objects(self) -> list[dict]:
+        result = []
+        for path in sorted(self.manifests.glob("*.json")):
+            try:
+                result.append(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError):
+                continue
+        return result
+
+    def resolve(self, digest: str) -> dict | None:
+        digest = digest.removeprefix("sha256:")
+        path = self.manifests / f"{digest}.json"
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None

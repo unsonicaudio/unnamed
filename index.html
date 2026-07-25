@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from .store import ObjectStore, utc_now
+
+
+class SnapshotManager:
+    def __init__(self, data_dir: Path, store: ObjectStore):
+        self.path = data_dir / "snapshots"
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.store = store
+
+    def save(self, name: str, state: dict) -> dict:
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", name):
+            raise ValueError("Snapshot name may only contain letters, numbers, dot, dash, underscore")
+        record = {
+            "snapshot": name,
+            "created": utc_now(),
+            "state": state,
+            "objects": [item.get("id") for item in self.store.list_objects()],
+        }
+        (self.path / f"{name}.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+        return record
+
+    def load(self, name: str) -> dict:
+        path = self.path / f"{name}.json"
+        if not path.exists():
+            raise FileNotFoundError(name)
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def list(self) -> list[dict]:
+        return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.path.glob("*.json"))]
