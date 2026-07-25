@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>X OUT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0d0e13;
+    --panel: #15171f;
+    --line: #262838;
+    --floor: #1b1d28;
+    --floor2: #1e2130;
+    --wall: #33364a;
+    --wall-hi: #454863;
+    --ice: #a9e7f0;
+    --ice-dk: #6fc4d4;
+    --block: #545872;
+    --block-hi: #7176a0;
+    --switch: #f2c14e;
+    --door: #e8546b;
+    --exit: #2dd4bf;
+    --x-orange: #ff5a36;
+    --x-dark: #17181d;
+    --text: #eef0f6;
+    --muted: #7d8199;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(circle at 50% -10%, #1b1e2c 0%, var(--bg) 55%);
+    color:var(--text);
+    font-family:'Space Mono', monospace;
+    overflow:hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select:none;
+  }
+  #app{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    padding:14px 10px 10px;
+  }
+  .arcade{
+    font-family:'Press Start 2P', monospace;
+  }
+  /* ---------- title bar ---------- */
+  #titleBar{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  #titleBar h1{
+    font-size:26px;
+    margin:0;
+    letter-spacing:2px;
+    color:var(--x-orange);
+    text-shadow: 0 0 14px rgba(255,90,54,0.45), 3px 3px 0 #7a1f0c;
+  }
+  #titleBar .tag{
+    font-size:9px;
+    color:var(--muted);
+    letter-spacing:1px;
+  }
+  #hud{
+    display:flex;
+    gap:14px;
+    align-items:center;
+    font-size:11px;
+    color:var(--muted);
+    margin-bottom:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  #hud .chip{
+    background:var(--panel);
+    border:1px solid var(--line);
+    padding:5px 10px;
+    border-radius:3px;
+    color:var(--text);
+  }
+  #hud .chip b{ color:var(--exit); }
+  /* ---------- canvas wrap ---------- */
+  #stage{
+    position:relative;
+    border:2px solid var(--line);
+    border-radius:6px;
+    background:var(--panel);
+    box-shadow: 0 0 0 6px #0a0b0f, 0 20px 50px rgba(0,0,0,0.55);
+    overflow:hidden;
+  }
+  canvas{ display:block; image-rendering: pixelated; }
+  #overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px;
+    background:rgba(9,10,15,0.88);
+    text-align:center;
+    padding:20px;
+  }
+  #overlay.hidden{ display:none; }
+  #overlay h2{
+    font-size:20px;
+    color:var(--exit);
+    text-shadow:0 0 16px rgba(45,212,191,0.5);
+    margin:0;
+  }
+  #overlay p{
+    color:var(--muted);
+    font-size:11px;
+    max-width:280px;
+    line-height:1.7;
+    margin:0;
+  }
+  .btn{
+    font-family:'Press Start 2P', monospace;
+    font-size:10px;
+    background:var(--x-orange);
+    color:#1a0a05;
+    border:none;
+    padding:12px 18px;
+    border-radius:3px;
+    cursor:pointer;
+    box-shadow: 0 4px 0 #a03217;
+    letter-spacing:1px;
+  }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a03217; }
+  .btn.ghost{
+    background:transparent;
+    color:var(--text);
+    border:1px solid var(--line);
+    box-shadow:none;
+  }
+  .btn.ghost:active{ transform:translateY(1px); }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  /* ---------- level select chips ---------- */
+  #levelPick{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; max-width:300px; }
+  .lvlchip{
+    font-family:'Press Start 2P', monospace;
+    font-size:10px;
+    padding:9px 12px;
+    background:var(--floor2);
+    border:1px solid var(--line);
+    border-radius:3px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .lvlchip.locked{ color:#454863; cursor:not-allowed; }
+  /* ---------- seed loader ---------- */
+  #seedLoader{
+    margin-top:4px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    align-items:center;
+    border-top:1px dashed var(--line);
+    padding-top:14px;
+    width:100%;
+    max-width:300px;
+  }
+  #seedLoader .seedLabel{
+    font-size:9px;
+    letter-spacing:1px;
+    color:var(--muted);
+  }
+  .seedRow{ display:flex; gap:6px; width:100%; flex-wrap:wrap; }
+  #seedInput{
+    flex:1;
+    min-width:0;
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    background:var(--floor2);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:8px 9px;
+    border-radius:3px;
+  }
+  #seedInput:focus{ outline:1px solid var(--exit); }
+  .btn.small{
+    font-size:8px;
+    padding:8px 10px;
+    box-shadow:none;
+  }
+  /* ---------- controls ---------- */
+  #controls{
+    margin-top:12px;
+    display:flex;
+    align-items:center;
+    gap:28px;
+  }
+  #dpad{
+    display:grid;
+    grid-template-columns:repeat(3,40px);
+    grid-template-rows:repeat(3,40px);
+    gap:4px;
+  }
+  #dpad button{
+    background:var(--floor2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:4px;
+    font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #dpad button:active{ background:var(--x-orange); color:#1a0a05; }
+  #dpad .up{grid-column:2; grid-row:1;}
+  #dpad .left{grid-column:1; grid-row:2;}
+  #dpad .down{grid-column:2; grid-row:2;}
+  #dpad .right{grid-column:3; grid-row:2;}
+  #activateBtn{
+    width:68px; height:68px;
+    border-radius:50%;
+    background:var(--exit);
+    color:#04231e;
+    border:none;
+    font-size:20px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:2px;
+    box-shadow:0 4px 0 #0f6a5d, 0 0 18px rgba(45,212,191,0.4);
+  }
+  #activateBtn span{ font-family:'Press Start 2P', monospace; font-size:6px; letter-spacing:0.5px; }
+  #activateBtn:active{ transform:translateY(3px); box-shadow:0 1px 0 #0f6a5d; }
+  #actions{ display:flex; flex-direction:column; gap:8px; }
+  #actions button{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:8px 12px;
+    border-radius:4px;
+  }
+  #legend{
+    margin-top:10px;
+    font-size:9px;
+    color:var(--muted);
+    text-align:center;
+    max-width:340px;
+    line-height:1.8;
+  }
+  #legend b{ color:var(--text); }
+  @media (max-width:480px){
+    #titleBar h1{ font-size:20px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="titleBar">
+    <h1 class="arcade">X OUT</h1>
+    <span class="tag">get the X to the safe zone</span>
+  </div>
+
+  <div id="hud">
+    <div class="chip">LEVEL <b id="hudLevel">1</b>/<span id="hudTotal">4</span></div>
+    <div class="chip"><span id="hudLevelName">First Steps</span></div>
+    <div class="chip">MOVES <b id="hudMoves">0</b></div>
+    <div class="chip" id="gpStatus" style="display:none;">🎮 CONNECTED</div>
+  </div>
+
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="overlay">
+      <h2 class="arcade" id="overlayTitle">X OUT</h2>
+      <p id="overlayText">Guide the X through each room to the glowing safe zone. Push blocks onto switches to open doors, and watch your footing on ice.</p>
+      <div id="levelPick"></div>
+      <div class="row" id="overlayButtons">
+        <button class="btn" id="startBtn">START</button>
+      </div>
+      <div id="seedLoader">
+        <div class="seedLabel">OR LOAD AN INFINITE SEED WORLD</div>
+        <div class="seedRow">
+          <input id="seedInput" type="text" value="9352bd41e692fa9203910c3bf1ae95b" spellcheck="false">
+          <button class="btn small" id="genSeedBtn">GENERATE</button>
+        </div>
+        <div class="seedRow">
+          <button class="btn ghost small" id="randSeedBtn">🎲 RANDOM SEED</button>
+          <button class="btn ghost small" id="loadFileBtn">📁 LOAD FILE</button>
+          <input type="file" id="fileInput" style="display:none">
+        </div>
+        <div id="worldInfo" class="seedLabel"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div id="dpad">
+      <button class="up" data-dir="up">▲</button>
+      <button class="left" data-dir="left">◀</button>
+      <button class="down" data-dir="down">▼</button>
+      <button class="right" data-dir="right">▶</button>
+    </div>
+    <button id="activateBtn">◉<span>ACTIVATE</span></button>
+    <div id="actions">
+      <button id="undoBtn">↺ UNDO</button>
+      <button id="resetBtn">⟲ RESET</button>
+      <button id="seedBtn"># SEED</button>
+    </div>
+  </div>
+
+  <div id="legend">
+    <b>Arrows/WASD</b> move · <b>Space</b> activate · <b>Z</b> undo · <b>R</b> reset · gamepad supported ·
+    <span style="color:var(--block-hi)">■</span> block
+    <span style="color:var(--switch)">●</span> switch
+    <span style="color:var(--exit)">◆</span> lever
+    <span style="color:var(--door)">▮</span> door
+    <span style="color:var(--ice)">▨</span> ice
+    <span style="color:var(--exit)">◇</span> safe zone
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // LEVEL DATA
+  // Tiles: # wall, . floor, P start, E exit/safe zone,
+  //        B block, S switch, D door (closed until switches covered), I ice
+  // ---------------------------------------------------------------
+  const LEVELS = [
+    {
+      name: "First Steps",
+      hint: "Just find your way to the safe zone.",
+      grid: [
+        "##########",
+        "#P.......#",
+        "#.######.#",
+        "#........#",
+        "#.######.#",
+        "#.......E#",
+        "##########",
+      ]
+    },
+    {
+      name: "Push & Open",
+      hint: "Push the block onto the switch to open the door.",
+      grid: [
+        "#########",
+        "#P..#..E#",
+        "#.B.D...#",
+        "#.S.#...#",
+        "#...#...#",
+        "#########",
+      ]
+    },
+    {
+      name: "Slippery",
+      hint: "Ice keeps you sliding until you hit something solid.",
+      grid: [
+        "#########",
+        "#P.....E#",
+        "#.#####.#",
+        "#IIIII..#",
+        "#########",
+      ]
+    },
+    {
+      name: "Lockdown",
+      hint: "Same trick, bigger room. Find the switch, then the door.",
+      grid: [
+        "###########",
+        "#P..#....E#",
+        "#...#####D#",
+        "#.B.#.....#",
+        "#.S.#.....#",
+        "#.........#",
+        "###########",
+      ]
+    },
+    {
+      name: "The Lever",
+      hint: "Stand on the lever and hit ACTIVATE to open the door.",
+      grid: [
+        "#########",
+        "#P..#..E#",
+        "#.M.D...#",
+        "#...#...#",
+        "#########",
+      ]
+    },
+  ];
+
+  const TILE = 48;
+
+  // ---------------------------------------------------------------
+  // STATE
+  // ---------------------------------------------------------------
+  let levelIndex = 0;
+  let unlocked = 1;
+  let staticGrid = [];   // 2D array of chars: '#','.','I','D','S','M' (frame), 'E'
+  let switches = [];     // {r,c} block-activated switches
+  let doors = [];        // {r,c}
+  let blocks = [];       // [{r,c}]
+  let levers = [];       // {r,c} manual switches, toggled by the ACTIVATE button
+  let leverPulled = false;
+  let player = {r:0,c:0};
+  let exitPos = {r:0,c:0};
+  let doorOpen = false;
+  let moves = 0;
+  let history = [];
+  let won = false;
+  let cols = 0, rows = 0;
+  let animT = 0;
+  let lastDir = "down";
+  let walkBob = 0;
+  let sliding = false;
+  let particles = [];
+
+  // infinite / procedural mode
+  let infiniteMode = false;
+  let currentDef = null;
+  let currentSeedHex = '';
+  let currentWorld = null;   // {label, hashHex, sizeBytes, levelCount, levels[]}
+  let worldLevelIndex = 0;
+
+  // gamepad
+  let gpPrev = {a:false, b:false, start:false};
+  let lastGpMoveTime = 0;
+  const GP_MOVE_REPEAT_MS = 150;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayText = document.getElementById('overlayText');
+  const overlayButtons = document.getElementById('overlayButtons');
+  const levelPick = document.getElementById('levelPick');
+  const hudLevel = document.getElementById('hudLevel');
+  const hudTotal = document.getElementById('hudTotal');
+  const hudLevelName = document.getElementById('hudLevelName');
+  const hudMoves = document.getElementById('hudMoves');
+
+  hudTotal.textContent = LEVELS.length;
+
+  // ---------------------------------------------------------------
+  // LEVEL LOADING
+  // ---------------------------------------------------------------
+  function loadLevelDef(def){
+    currentDef = def;
+    const grid = def.grid;
+    rows = grid.length;
+    cols = grid[0].length;
+    staticGrid = [];
+    switches = [];
+    doors = [];
+    blocks = [];
+    levers = [];
+
+    for(let r=0;r<rows;r++){
+      const rowArr = [];
+      for(let c=0;c<cols;c++){
+        const ch = grid[r][c] || '#';
+        if(ch === 'P'){
+          player = {r,c};
+          rowArr.push('.');
+        } else if(ch === 'E'){
+          exitPos = {r,c};
+          rowArr.push('E');
+        } else if(ch === 'B'){
+          blocks.push({r,c});
+          rowArr.push('.');
+        } else if(ch === 'S'){
+          switches.push({r,c});
+          rowArr.push('S');
+        } else if(ch === 'D'){
+          doors.push({r,c});
+          rowArr.push('D');
+        } else if(ch === 'M'){
+          levers.push({r,c});
+          rowArr.push('M');
+        } else {
+          rowArr.push(ch);
+        }
+      }
+      staticGrid.push(rowArr);
+    }
+    moves = 0;
+    won = false;
+    doorOpen = false;
+    leverPulled = false;
+    history = [];
+    sliding = false;
+    recomputeDoor();
+    resizeCanvas();
+    updateHud();
+  }
+
+  function parseLevel(idx){
+    infiniteMode = false;
+    loadLevelDef(LEVELS[idx]);
+  }
+
+  function resizeCanvas(){
+    canvas.width = cols * TILE;
+    canvas.height = rows * TILE;
+  }
+
+  function recomputeDoor(){
+    const blockPart = switches.length === 0
+      ? true
+      : switches.every(s => blocks.some(b => b.r===s.r && b.c===s.c));
+    const leverPart = levers.length === 0 ? true : leverPulled;
+    doorOpen = blockPart && leverPart;
+  }
+
+  function tileAt(r,c){
+    if(r<0||c<0||r>=rows||c>=cols) return '#';
+    return staticGrid[r][c];
+  }
+
+  function blockAt(r,c){
+    return blocks.find(b=>b.r===r && b.c===c);
+  }
+
+  function passable(r,c){
+    const t = tileAt(r,c);
+    if(t === '#') return false;
+    if(t === 'D' && !doorOpen) return false;
+    return true;
+  }
+
+  // ---------------------------------------------------------------
+  // MOVEMENT
+  // ---------------------------------------------------------------
+  const DIRS = {
+    up: {dr:-1, dc:0},
+    down: {dr:1, dc:0},
+    left: {dr:0, dc:-1},
+    right: {dr:0, dc:1},
+  };
+
+  function snapshot(){
+    return {
+      player: {...player},
+      blocks: blocks.map(b=>({...b})),
+      moves,
+      doorOpen,
+      leverPulled,
+    };
+  }
+
+  function restore(s){
+    player = {...s.player};
+    blocks = s.blocks.map(b=>({...b}));
+    moves = s.moves;
+    doorOpen = s.doorOpen;
+    leverPulled = s.leverPulled;
+  }
+
+  function activate(){
+    if(won || sliding) return;
+    const t = tileAt(player.r, player.c);
+    if(t !== 'M' || leverPulled) return;
+    history.push(snapshot());
+    leverPulled = true;
+    recomputeDoor();
+    spawnActivateParticles();
+    updateHud();
+    draw();
+  }
+
+  function tryMove(dirName){
+    if(won || sliding) return;
+    const d = DIRS[dirName];
+    if(!d) return;
+    lastDir = dirName;
+
+    const nr = player.r + d.dr, nc = player.c + d.dc;
+    const blk = blockAt(nr,nc);
+
+    if(blk){
+      const br = nr + d.dr, bc = nc + d.dc;
+      if(!passable(br,bc) || blockAt(br,bc)) return; // push blocked
+      history.push(snapshot());
+      blk.r = br; blk.c = bc;
+      player = {r:nr, c:nc};
+      recomputeDoor();
+      moves++;
+      settleAfterMove(dirName);
+      return;
+    }
+
+    if(!passable(nr,nc)) return;
+
+    history.push(snapshot());
+    player = {r:nr, c:nc};
+    moves++;
+    settleAfterMove(dirName);
+  }
+
+  function settleAfterMove(dirName){
+    updateHud();
+    // ice sliding chain
+    const d = DIRS[dirName];
+    const doSlide = () => {
+      const t = tileAt(player.r, player.c);
+      if(t !== 'I'){ finishMove(); return; }
+      const nr = player.r + d.dr, nc = player.c + d.dc;
+      if(blockAt(nr,nc) || !passable(nr,nc)){ finishMove(); return; }
+      sliding = true;
+      spawnSlideParticle();
+      setTimeout(()=>{
+        player = {r:nr, c:nc};
+        draw();
+        doSlide();
+      }, 55);
+    };
+    if(tileAt(player.r, player.c) === 'I'){
+      doSlide();
+    } else {
+      finishMove();
+    }
+  }
+
+  function finishMove(){
+    sliding = false;
+    draw();
+    if(player.r === exitPos.r && player.c === exitPos.c){
+      win();
+    }
+  }
+
+  function undo(){
+    if(history.length === 0 || won) return;
+    restore(history.pop());
+    recomputeDoor();
+    updateHud();
+    draw();
+  }
+
+  function resetLevel(){
+    if(infiniteMode && currentWorld){
+      loadLevelDef(currentWorld.levels[worldLevelIndex]);
+      infiniteMode = true;
+    } else {
+      parseLevel(levelIndex);
+    }
+    draw();
+  }
+
+  function win(){
+    won = true;
+    if(!infiniteMode) unlocked = Math.max(unlocked, levelIndex + 2);
+    spawnWinParticles();
+    setTimeout(showWinOverlay, 420);
+  }
+
+  // ---------------------------------------------------------------
+  // HUD / OVERLAY
+  // ---------------------------------------------------------------
+  function updateHud(){
+    if(infiniteMode && currentWorld){
+      hudLevel.textContent = worldLevelIndex + 1;
+      hudTotal.textContent = currentWorld.levelCount;
+      hudLevelName.textContent = currentDef.name;
+    } else {
+      hudLevel.textContent = levelIndex + 1;
+      hudTotal.textContent = LEVELS.length;
+      hudLevelName.textContent = LEVELS[levelIndex].name;
+    }
+    hudMoves.textContent = moves;
+  }
+
+  function buildLevelPick(){
+    levelPick.innerHTML = '';
+    LEVELS.forEach((lvl,i)=>{
+      const chip = document.createElement('div');
+      chip.className = 'lvlchip' + (i < unlocked ? '' : ' locked');
+      chip.textContent = (i+1) + (i < unlocked ? '' : ' 🔒');
+      if(i < unlocked){
+        chip.onclick = () => { startLevel(i); };
+      }
+      levelPick.appendChild(chip);
+    });
+  }
+
+  function showTitleOverlay(){
+    overlay.classList.remove('hidden');
+    overlayTitle.textContent = 'X OUT';
+    overlayText.textContent = 'Guide the X through each room to the glowing safe zone. Push blocks onto switches to open doors, and watch your footing on ice.';
+    buildLevelPick();
+    overlayButtons.innerHTML = '<button class="btn" id="startBtn2">START</button>';
+    document.getElementById('startBtn2').onclick = () => startLevel(0);
+  }
+
+  function showWinOverlay(){
+    overlay.classList.remove('hidden');
+    overlayButtons.innerHTML = '';
+
+    if(infiniteMode && currentWorld){
+      const isWorldLast = worldLevelIndex === currentWorld.levelCount - 1;
+      overlayTitle.textContent = isWorldLast ? 'WORLD CLEAR' : 'ROOM CLEAR';
+      overlayText.textContent = isWorldLast
+        ? `Cleared all ${currentWorld.levelCount} rooms of "${currentWorld.label}" (hash ${currentWorld.hashHex.slice(0,8)}…). Load a new seed or file for another world.`
+        : `Cleared in ${moves} moves. Room ${worldLevelIndex+1} of ${currentWorld.levelCount} in this world.`;
+      buildLevelPick();
+      if(!isWorldLast){
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn';
+        nextBtn.textContent = 'NEXT ROOM';
+        nextBtn.onclick = () => {
+          worldLevelIndex++;
+          loadLevelDef(currentWorld.levels[worldLevelIndex]);
+          infiniteMode = true;
+          overlay.classList.add('hidden');
+          draw();
+        };
+        overlayButtons.appendChild(nextBtn);
+      }
+      const again = document.createElement('button');
+      again.className = 'btn ghost';
+      again.textContent = 'REPLAY ROOM';
+      again.onclick = () => { resetLevel(); overlay.classList.add('hidden'); };
+      overlayButtons.appendChild(again);
+      return;
+    }
+
+    const isLast = levelIndex === LEVELS.length - 1;
+    overlayTitle.textContent = isLast ? 'ALL CLEAR' : 'ROOM CLEAR';
+    overlayText.textContent = isLast
+      ? `You cleared every room in ${moves} total keystrokes on this run. Nicely done.`
+      : `Cleared in ${moves} moves.`;
+    buildLevelPick();
+    if(!isLast){
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'btn';
+      nextBtn.textContent = 'NEXT ROOM';
+      nextBtn.onclick = () => startLevel(levelIndex+1);
+      overlayButtons.appendChild(nextBtn);
+    }
+    const again = document.createElement('button');
+    again.className = 'btn ghost';
+    again.textContent = 'REPLAY';
+    again.onclick = () => startLevel(levelIndex);
+    overlayButtons.appendChild(again);
+  }
+
+  function startLevel(idx){
+    levelIndex = idx;
+    parseLevel(idx);
+    overlay.classList.add('hidden');
+    draw();
+  }
+
+  document.getElementById('startBtn').onclick = () => {
+    buildLevelPick();
+    startLevel(0);
+  };
+
+  // ---------------------------------------------------------------
+  // INPUT
+  // ---------------------------------------------------------------
+  window.addEventListener('keydown', (e)=>{
+    if(!overlay.classList.contains('hidden')) return;
+    const k = e.key.toLowerCase();
+    if(['arrowup','w'].includes(k)) { tryMove('up'); e.preventDefault(); }
+    else if(['arrowdown','s'].includes(k)) { tryMove('down'); e.preventDefault(); }
+    else if(['arrowleft','a'].includes(k)) { tryMove('left'); e.preventDefault(); }
+    else if(['arrowright','d'].includes(k)) { tryMove('right'); e.preventDefault(); }
+    else if(k === 'z' || k === 'backspace') { undo(); e.preventDefault(); }
+    else if(k === 'r') { resetLevel(); }
+    else if(k === ' ' || k === 'spacebar' || k === 'enter') { activate(); e.preventDefault(); }
+  });
+
+  document.querySelectorAll('#dpad button').forEach(btn=>{
+    btn.addEventListener('click', ()=> tryMove(btn.dataset.dir));
+  });
+  document.getElementById('undoBtn').onclick = undo;
+  document.getElementById('resetBtn').onclick = resetLevel;
+  document.getElementById('activateBtn').onclick = activate;
+  document.getElementById('seedBtn').onclick = () => {
+    overlay.classList.remove('hidden');
+    overlayTitle.textContent = infiniteMode ? currentDef.name : 'X OUT';
+    overlayText.textContent = 'Load a different seed, or jump back into the story rooms below.';
+    buildLevelPick();
+    overlayButtons.innerHTML = '<button class="btn ghost" id="resumeBtn">RESUME</button>';
+    document.getElementById('resumeBtn').onclick = () => overlay.classList.add('hidden');
+  };
+
+  // ---------------------------------------------------------------
+  // GAMEPAD SUPPORT
+  // ---------------------------------------------------------------
+  window.addEventListener('gamepadconnected', ()=>{
+    document.getElementById('gpStatus').style.display = 'inline-block';
+  });
+  window.addEventListener('gamepaddisconnected', ()=>{
+    document.getElementById('gpStatus').style.display = 'none';
+  });
+
+  function pollGamepad(){
+    if(!navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    const gp = pads && pads[0];
+    if(!gp) return;
+    document.getElementById('gpStatus').style.display = 'inline-block';
+
+    const DEAD = 0.5;
+    const axUp = gp.axes[1] < -DEAD, axDown = gp.axes[1] > DEAD;
+    const axLeft = gp.axes[0] < -DEAD, axRight = gp.axes[0] > DEAD;
+    const bUp = (gp.buttons[12] && gp.buttons[12].pressed) || axUp;
+    const bDown = (gp.buttons[13] && gp.buttons[13].pressed) || axDown;
+    const bLeft = (gp.buttons[14] && gp.buttons[14].pressed) || axLeft;
+    const bRight = (gp.buttons[15] && gp.buttons[15].pressed) || axRight;
+
+    if(overlay.classList.contains('hidden')){
+      const now = performance.now();
+      if(now - lastGpMoveTime > GP_MOVE_REPEAT_MS){
+        if(bUp){ tryMove('up'); lastGpMoveTime = now; }
+        else if(bDown){ tryMove('down'); lastGpMoveTime = now; }
+        else if(bLeft){ tryMove('left'); lastGpMoveTime = now; }
+        else if(bRight){ tryMove('right'); lastGpMoveTime = now; }
+      }
+      const aNow = !!(gp.buttons[0] && gp.buttons[0].pressed);
+      if(aNow && !gpPrev.a) activate();
+      gpPrev.a = aNow;
+
+      const bNow = !!(gp.buttons[1] && gp.buttons[1].pressed);
+      if(bNow && !gpPrev.b) undo();
+      gpPrev.b = bNow;
+
+      const startNow = !!(gp.buttons[9] && gp.buttons[9].pressed);
+      if(startNow && !gpPrev.start) resetLevel();
+      gpPrev.start = startNow;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // PARTICLES (tiny juice)
+  // ---------------------------------------------------------------
+  function spawnSlideParticle(){
+    particles.push({
+      x: player.c*TILE + TILE/2, y: player.r*TILE + TILE/2,
+      vx:(Math.random()-0.5)*1.5, vy:(Math.random()-0.5)*1.5,
+      life: 18, color:'#eafcff'
+    });
+  }
+  function spawnActivateParticles(){
+    for(let i=0;i<12;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = 1 + Math.random()*1.8;
+      particles.push({
+        x: player.c*TILE+TILE/2, y: player.r*TILE+TILE/2,
+        vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+        life: 22+Math.random()*10, color:'#2dd4bf'
+      });
+    }
+  }
+  function spawnWinParticles(){
+    for(let i=0;i<26;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = 1.5 + Math.random()*2.5;
+      particles.push({
+        x: exitPos.c*TILE+TILE/2, y: exitPos.r*TILE+TILE/2,
+        vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd,
+        life: 40+Math.random()*20,
+        color: Math.random()<0.5 ? '#2dd4bf' : '#ff5a36'
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // RENDERING
+  // ---------------------------------------------------------------
+  function drawTile(r,c){
+    const t = staticGrid[r][c];
+    const x = c*TILE, y = r*TILE;
+    const checker = (r+c)%2===0;
+
+    if(t === '#'){
+      ctx.fillStyle = getCss('--wall');
+      ctx.fillRect(x,y,TILE,TILE);
+      ctx.fillStyle = getCss('--wall-hi');
+      ctx.fillRect(x,y,TILE,5);
+      ctx.fillRect(x,y,5,TILE);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(x,y+TILE-5,TILE,5);
+      ctx.fillRect(x+TILE-5,y,5,TILE);
+      return;
+    }
+
+    // floor base for all non-wall tiles
+    ctx.fillStyle = checker ? getCss('--floor') : getCss('--floor2');
+    ctx.fillRect(x,y,TILE,TILE);
+
+    if(t === 'I'){
+      ctx.fillStyle = getCss('--ice');
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(x+2,y+2,TILE-4,TILE-4);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = getCss('--ice-dk');
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x+8,y+TILE-10); ctx.lineTo(x+TILE-14,y+8);
+      ctx.moveTo(x+6,y+18); ctx.lineTo(x+22,y+6);
+      ctx.stroke();
+    }
+
+    if(t === 'S'){
+      const covered = blockAt(r,c) !== undefined;
+      const pulse = 0.5 + 0.5*Math.sin(animT/16);
+      ctx.beginPath();
+      ctx.arc(x+TILE/2,y+TILE/2, 10 + (covered?0:pulse*2), 0, Math.PI*2);
+      ctx.fillStyle = covered ? '#8a6a1d' : getCss('--switch');
+      ctx.globalAlpha = covered ? 0.6 : 1;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#5c4413';
+      ctx.stroke();
+    }
+
+    if(t === 'M'){
+      const pulse = 0.5 + 0.5*Math.sin(animT/16);
+      ctx.strokeStyle = leverPulled ? getCss('--exit') : '#8a8fae';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x+TILE/2, y+TILE/2+6, 12, Math.PI, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      const hx = leverPulled ? x+TILE-14 : x+14;
+      const hy = leverPulled ? y+TILE/2-2 : y+TILE/2+10;
+      ctx.moveTo(x+TILE/2, y+TILE/2+6);
+      ctx.lineTo(hx, hy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.fillStyle = leverPulled ? getCss('--exit') : getCss('--switch');
+      ctx.globalAlpha = leverPulled ? 1 : 0.7+pulse*0.3;
+      ctx.arc(hx, hy, 5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    if(t === 'D'){
+      if(doorOpen){
+        ctx.strokeStyle = 'rgba(232,84,107,0.35)';
+        ctx.setLineDash([4,3]);
+        ctx.strokeRect(x+4,y+4,TILE-8,TILE-8);
+        ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = getCss('--door');
+        for(let i=0;i<3;i++){
+          ctx.fillRect(x+6+i*13,y+5,8,TILE-10);
+        }
+        ctx.fillStyle = '#7a1f2b';
+        ctx.fillRect(x+2,y+5,TILE-4,4);
+        ctx.fillRect(x+2,y+TILE-9,TILE-4,4);
+      }
+    }
+
+    if(t === 'E'){
+      const pulse = 0.5 + 0.5*Math.sin(animT/14);
+      const grad = ctx.createRadialGradient(x+TILE/2,y+TILE/2,2,x+TILE/2,y+TILE/2,TILE*0.55);
+      grad.addColorStop(0, 'rgba(45,212,191,0.55)');
+      grad.addColorStop(1, 'rgba(45,212,191,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x-8,y-8,TILE+16,TILE+16);
+      ctx.strokeStyle = getCss('--exit');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      const rad = 12 + pulse*4;
+      ctx.moveTo(x+TILE/2, y+TILE/2-rad);
+      ctx.lineTo(x+TILE/2+rad, y+TILE/2);
+      ctx.lineTo(x+TILE/2, y+TILE/2+rad);
+      ctx.lineTo(x+TILE/2-rad, y+TILE/2);
+      ctx.closePath();
+      ctx.stroke();
+    }
+  }
+
+  function drawBlock(b){
+    const x = b.c*TILE, y = b.r*TILE;
+    const onSwitch = tileAt(b.r,b.c) === 'S';
+    ctx.fillStyle = onSwitch ? '#9c8330' : getCss('--block');
+    ctx.fillRect(x+4,y+4,TILE-8,TILE-8);
+    ctx.fillStyle = getCss('--block-hi');
+    ctx.fillRect(x+4,y+4,TILE-8,7);
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x+4,y+4,TILE-8,TILE-8);
+  }
+
+  function drawX(px,py,dir,bob){
+    const cx = px*TILE + TILE/2;
+    const cy = py*TILE + TILE/2 - Math.abs(bob);
+    const s = TILE*0.30;
+
+    ctx.save();
+    ctx.translate(cx,cy);
+
+    const legSwing = Math.sin(walkBob) * 6;
+
+    // --- legs (outline + fill) ---
+    ctx.lineCap = 'round';
+    [ -1, 1 ].forEach((side,i)=>{
+      const swing = (i===0? legSwing : -legSwing);
+      ctx.lineWidth = 9;
+      ctx.strokeStyle = getCss('--x-dark');
+      ctx.beginPath();
+      ctx.moveTo(side*s*0.35, s*0.55);
+      ctx.lineTo(side*s*0.55 + swing*0.2, s*1.05);
+      ctx.stroke();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = getCss('--x-orange');
+      ctx.beginPath();
+      ctx.moveTo(side*s*0.35, s*0.55);
+      ctx.lineTo(side*s*0.55 + swing*0.2, s*1.05);
+      ctx.stroke();
+    });
+
+    // --- arms ---
+    [-1,1].forEach((side,i)=>{
+      const swing = (i===0? -legSwing : legSwing);
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = getCss('--x-dark');
+      ctx.beginPath();
+      ctx.moveTo(side*s*0.15, -s*0.05);
+      ctx.lineTo(side*s*1.05, s*0.15 + swing*0.15);
+      ctx.stroke();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = getCss('--x-orange');
+      ctx.beginPath();
+      ctx.moveTo(side*s*0.15, -s*0.05);
+      ctx.lineTo(side*s*1.05, s*0.15 + swing*0.15);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.fillStyle = getCss('--x-orange');
+      ctx.arc(side*s*1.05, s*0.15 + swing*0.15, 4, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // --- big bold X torso (outline then fill) ---
+    ctx.lineWidth = 17;
+    ctx.strokeStyle = getCss('--x-dark');
+    ctx.beginPath();
+    ctx.moveTo(-s, -s); ctx.lineTo(s, s);
+    ctx.moveTo(s, -s); ctx.lineTo(-s, s);
+    ctx.stroke();
+
+    ctx.lineWidth = 12;
+    ctx.strokeStyle = getCss('--x-orange');
+    ctx.beginPath();
+    ctx.moveTo(-s, -s); ctx.lineTo(s, s);
+    ctx.moveTo(s, -s); ctx.lineTo(-s, s);
+    ctx.stroke();
+
+    // --- head ---
+    const headY = -s*1.35;
+    ctx.beginPath();
+    ctx.fillStyle = getCss('--x-dark');
+    ctx.arc(0, headY, 12.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = getCss('--x-orange');
+    ctx.arc(0, headY, 10, 0, Math.PI*2);
+    ctx.fill();
+
+    // eyes: look in facing direction, blink occasionally
+    const blink = (Math.floor(animT/50) % 27 === 0);
+    const look = dir==='left'?-2 : dir==='right'?2 : 0;
+    ctx.fillStyle = '#17181d';
+    if(blink){
+      ctx.fillRect(-6+look,headY-1,4,1.6);
+      ctx.fillRect(2+look,headY-1,4,1.6);
+    } else {
+      ctx.beginPath(); ctx.arc(-4+look,headY-1,1.9,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(4+look,headY-1,1.9,0,Math.PI*2); ctx.fill();
+    }
+    // little smile
+    ctx.strokeStyle = '#17181d';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(look*0.5, headY+3, 4, 0.15*Math.PI, 0.85*Math.PI);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawParticles(){
+    particles.forEach(p=>{
+      ctx.globalAlpha = Math.max(0, p.life/40);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x-2,p.y-2,4,4);
+      ctx.globalAlpha = 1;
+    });
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life--; });
+    particles = particles.filter(p=>p.life>0);
+  }
+
+  function getCss(varName){
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        drawTile(r,c);
+      }
+    }
+    blocks.forEach(drawBlock);
+    const bob = Math.sin(animT/20)*2;
+    drawX(player.c, player.r, lastDir, sliding? 0 : bob);
+    drawParticles();
+  }
+
+  function loop(){
+    animT++;
+    walkBob += 0.35;
+    pollGamepad();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------------------------------------------------------------
+  // SEED-BASED PROCEDURAL LEVEL GENERATOR
+  // Any text/hash string deterministically produces the same room,
+  // every time, on every machine: hash -> seeded PRNG -> maze carve
+  // -> puzzle piece placed so it is always solvable by construction.
+  // ---------------------------------------------------------------
+  function hashSeed(str){
+    let h = 0x811c9dc5;
+    for(let i=0;i<str.length;i++){
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function findStraightRun(trail, minLen, avoidRange){
+    for(let i=0;i<trail.length-minLen;i++){
+      if(avoidRange && i>=avoidRange.lo && i<=avoidRange.hi) continue;
+      const dr = trail[i+1].r-trail[i].r, dc = trail[i+1].c-trail[i].c;
+      if(dr===0 && dc===0) continue;
+      let len = 1;
+      while(i+len < trail.length-1){
+        const ndr = trail[i+len+1].r-trail[i+len].r, ndc = trail[i+len+1].c-trail[i+len].c;
+        if(ndr!==dr || ndc!==dc) break;
+        len++;
+      }
+      if(len >= minLen) return {start:i, len, dr, dc};
+    }
+    return null;
+  }
+
+  // Compact BFS over (player position, block positions, lever state).
+  // Used at generation time to actually verify a candidate room is
+  // completable before it's shown to the player -- not just assumed.
+  function solveGrid(gridStrings){
+    const rr = gridStrings.length, cc = gridStrings[0].length;
+    let ply, ex, blks=[], sws=[], lvs=[];
+    const stat = gridStrings.map(row=>row.split(''));
+    for(let r=0;r<rr;r++) for(let c=0;c<cc;c++){
+      const ch = stat[r][c];
+      if(ch==='P'){ ply={r,c}; stat[r][c]='.'; }
+      else if(ch==='E'){ ex={r,c}; }
+      else if(ch==='B'){ blks.push({r,c}); stat[r][c]='.'; }
+      else if(ch==='S'){ sws.push({r,c}); }
+      else if(ch==='M'){ lvs.push({r,c}); }
+    }
+    const key = (p,bl,lv) => p.r+','+p.c+'|'+bl.map(b=>b.r+','+b.c).sort().join(';')+'|'+lv;
+    const startState = {player:{...ply}, blocks: blks.map(b=>({...b})), lever:false};
+    const seen = new Set([key(startState.player,startState.blocks,startState.lever)]);
+    const queue = [startState];
+    const dirs = [{dr:-1,dc:0},{dr:1,dc:0},{dr:0,dc:-1},{dr:0,dc:1}];
+    const isOpen = (bl,lv) => {
+      const bp = sws.length===0 ? true : sws.every(s=>bl.some(b=>b.r===s.r&&b.c===s.c));
+      const lp = lvs.length===0 ? true : lv;
+      return bp && lp;
+    };
+    const pass = (r,c,bl,lv) => {
+      if(r<0||c<0||r>=rr||c>=cc) return false;
+      const t = stat[r][c];
+      if(t==='#') return false;
+      if(t==='D' && !isOpen(bl,lv)) return false;
+      return true;
+    };
+    let qi=0, steps=0;
+    while(qi<queue.length){
+      steps++;
+      if(steps>200000) return false;
+      const st = queue[qi++];
+      if(st.player.r===ex.r && st.player.c===ex.c) return true;
+      if(lvs.some(l=>l.r===st.player.r&&l.c===st.player.c) && !st.lever){
+        const ns = {player:st.player, blocks:st.blocks, lever:true};
+        const k = key(ns.player,ns.blocks,ns.lever);
+        if(!seen.has(k)){ seen.add(k); queue.push(ns); }
+      }
+      for(const d of dirs){
+        const nr = st.player.r+d.dr, nc = st.player.c+d.dc;
+        const bi = st.blocks.findIndex(b=>b.r===nr&&b.c===nc);
+        if(bi>=0){
+          const br = nr+d.dr, bc = nc+d.dc;
+          if(!pass(br,bc,st.blocks,st.lever)) continue;
+          if(st.blocks.some(b=>b.r===br&&b.c===bc)) continue;
+          const nb = st.blocks.map((b,i)=> i===bi? {r:br,c:bc} : {...b});
+          const ns = {player:{r:nr,c:nc}, blocks:nb, lever:st.lever};
+          const k = key(ns.player,ns.blocks,ns.lever);
+          if(!seen.has(k)){ seen.add(k); queue.push(ns); }
+          continue;
+        }
+        if(!pass(nr,nc,st.blocks,st.lever)) continue;
+        const ns = {player:{r:nr,c:nc}, blocks:st.blocks, lever:st.lever};
+        const k = key(ns.player,ns.blocks,ns.lever);
+        if(!seen.has(k)){ seen.add(k); queue.push(ns); }
+      }
+    }
+    return false;
+  }
+
+  function generateLevelFromSeed(seedStr){
+    const COLS = 13, ROWS = 9;
+    const rand = mulberry32(hashSeed(seedStr));
+    const g = Array.from({length:ROWS}, ()=>Array(COLS).fill('#'));
+    const start = {r:1,c:1};
+    const exit = {r:ROWS-2, c:COLS-2};
+    let cur = {...start};
+    g[cur.r][cur.c] = '.';
+    const trail = [{...cur}];       // every single step of the walk (always grid-adjacent)
+    const discovered = [{...cur}];  // just the newly-carved cells, for cosmetics
+
+    let guard = 0;
+    while((cur.r!==exit.r || cur.c!==exit.c) && guard < 500){
+      guard++;
+      const toward = [];
+      if(cur.r > exit.r) toward.push({dr:-1,dc:0});
+      else if(cur.r < exit.r) toward.push({dr:1,dc:0});
+      if(cur.c > exit.c) toward.push({dr:0,dc:-1});
+      else if(cur.c < exit.c) toward.push({dr:0,dc:1});
+      const all = [{dr:-1,dc:0},{dr:1,dc:0},{dr:0,dc:-1},{dr:0,dc:1}];
+      const pool = (rand() < 0.72 && toward.length) ? toward : all;
+      const pick = pool[Math.floor(rand()*pool.length)];
+      const nr = Math.min(Math.max(cur.r+pick.dr,1),ROWS-2);
+      const nc = Math.min(Math.max(cur.c+pick.dc,1),COLS-2);
+      if(nr===cur.r && nc===cur.c) continue;
+      cur = {r:nr,c:nc};
+      trail.push({...cur});
+      if(g[cur.r][cur.c] === '#'){ g[cur.r][cur.c] = '.'; discovered.push({...cur}); }
+    }
+    if(cur.r!==exit.r || cur.c!==exit.c){
+      let r=cur.r, c=cur.c;
+      while(r!==exit.r){ r += r<exit.r?1:-1; if(g[r][c]==='#'){ g[r][c]='.'; discovered.push({r,c}); } trail.push({r,c}); }
+      while(c!==exit.c){ c += c<exit.c?1:-1; if(g[r][c]==='#'){ g[r][c]='.'; discovered.push({r,c}); } trail.push({r,c}); }
+    }
+    g[start.r][start.c] = '.';
+    g[exit.r][exit.c] = '.';
+
+    // a few cosmetic branch pockets off the main path
+    for(let i=0;i<5;i++){
+      const p = discovered[Math.floor(rand()*discovered.length)];
+      const rr = Math.min(Math.max(p.r + (Math.floor(rand()*3)-1),1),ROWS-2);
+      const cc = Math.min(Math.max(p.c + (Math.floor(rand()*3)-1),1),COLS-2);
+      g[rr][cc] = '.';
+    }
+
+    // ice patch: a straight run of the corridor becomes slippery
+    const iceRun = findStraightRun(trail, 4, null);
+    if(iceRun){
+      for(let k=1;k<iceRun.len-1;k++){
+        const cell = trail[iceRun.start+k];
+        g[cell.r][cell.c] = 'I';
+      }
+    }
+
+    // block/switch or lever, pushed sideways into a dead-end pocket off
+    // the corridor (never blocking the corridor itself), gated by a door.
+    // Each candidate placement is verified with the real solver before
+    // being committed -- if it would make the room impossible, it's
+    // discarded and the next candidate is tried.
+    function inBounds(r,c){ return r>=1 && r<=ROWS-2 && c>=1 && c<=COLS-2; }
+    function snap(){ return g.map(row=>row.slice()); }
+    let placed = false;
+    const candidates = [];
+    for(let i=2;i<trail.length-2;i++){
+      if(iceRun && i>=iceRun.start-1 && i<=iceRun.start+iceRun.len+1) continue;
+      candidates.push(i);
+    }
+    for(let i=candidates.length-1;i>0;i--){
+      const j = Math.floor(rand()*(i+1));
+      [candidates[i],candidates[j]] = [candidates[j],candidates[i]];
+    }
+
+    for(const i of candidates){
+      const dr = trail[i+1].r-trail[i].r, dc = trail[i+1].c-trail[i].c;
+      if(dr===0 && dc===0) continue;
+      const perps = rand()<0.5 ? [{dr:dc,dc:-dr},{dr:-dc,dc:dr}] : [{dr:-dc,dc:dr},{dr:dc,dc:-dr}];
+      let ok = false;
+      for(const perp of perps){
+        const s1 = {r:trail[i].r+perp.dr, c:trail[i].c+perp.dc};
+        const s2 = {r:trail[i].r+2*perp.dr, c:trail[i].c+2*perp.dc};
+        if(!inBounds(s1.r,s1.c) || !inBounds(s2.r,s2.c)) continue;
+        if(g[s1.r][s1.c] !== '#' || g[s2.r][s2.c] !== '#') continue;
+        const doorCell = trail[i+1];
+        if(g[doorCell.r][doorCell.c] !== '.') continue;
+
+        const trial = snap();
+        const useLever = rand() < 0.4;
+        if(useLever){ trial[s1.r][s1.c] = 'M'; }
+        else { trial[s1.r][s1.c] = 'B'; trial[s2.r][s2.c] = 'S'; }
+        trial[doorCell.r][doorCell.c] = 'D';
+        const testStrings = trial.map((row,ri)=> row.map((ch,ci)=>
+          (ri===start.r&&ci===start.c) ? 'P' : (ri===exit.r&&ci===exit.c) ? 'E' : ch
+        ).join(''));
+
+        if(solveGrid(testStrings)){
+          for(let rr=0;rr<ROWS;rr++) for(let cc2=0;cc2<COLS;cc2++) g[rr][cc2] = trial[rr][cc2];
+          ok = true; placed = true;
+          break;
+        }
+      }
+      if(ok) break;
+    }
+
+    g[start.r][start.c] = 'P';
+    g[exit.r][exit.c] = 'E';
+    const grid = g.map(row=>row.join(''));
+
+    // belt-and-suspenders: if nothing verified, ship the always-solvable bare maze
+    if(!solveGrid(grid)){
+      const bare = Array.from({length:ROWS}, (_,r)=>Array.from({length:COLS},(_,c)=>{
+        if(r===start.r && c===start.c) return 'P';
+        if(r===exit.r && c===exit.c) return 'E';
+        return trail.some(t=>t.r===r&&t.c===c) ? '.' : '#';
+      }).join(''));
+      return { name: 'Seed ' + seedStr.slice(0,12), grid: bare };
+    }
+
+    return {
+      name: 'Seed ' + seedStr.slice(0,12) + (seedStr.length>12?'…':''),
+      grid,
+    };
+  }
+
+  async function sha256Hex(bytes){
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+
+  // How many rooms a given input builds:
+  //  - bigger input -> more rooms (log2 of byte size, so it grows gracefully
+  //    from a short typed word up through a multi-megabyte file)
+  //  - the hash adds a small deterministic amount of variation on top, so two
+  //    inputs of the same size don't always build identically-sized worlds
+  const MAX_WORLD_ROOMS = 24;
+  function computeWorldSize(sizeBytes, hashHex){
+    const sizeRooms = Math.floor(Math.log2(Math.max(sizeBytes,1) + 1)) + 1;
+    const hashBonus = parseInt(hashHex.slice(0,8), 16) % 5; // 0-4, deterministic per hash
+    return Math.max(1, Math.min(MAX_WORLD_ROOMS, sizeRooms + hashBonus));
+  }
+
+  async function startWorldFromBytes(bytes, label){
+    const genBtn = document.getElementById('genSeedBtn');
+    const worldInfo = document.getElementById('worldInfo');
+    const prevLabel = genBtn.textContent;
+    genBtn.disabled = true;
+    genBtn.textContent = 'HASHING…';
+    worldInfo.textContent = '';
+
+    const hashHex = await sha256Hex(bytes);
+    const sizeBytes = bytes.length;
+    const levelCount = computeWorldSize(sizeBytes, hashHex);
+
+    genBtn.textContent = 'BUILDING…';
+    // let the UI paint the "building" state before the (synchronous,
+    // solver-verified) generation work runs
+    await new Promise(r => setTimeout(r, 10));
+
+    const levels = [];
+    for(let i=0;i<levelCount;i++){
+      levels.push(generateLevelFromSeed(hashHex + ':' + i));
+    }
+
+    currentWorld = { label, hashHex, sizeBytes, levelCount, levels };
+    worldLevelIndex = 0;
+    infiniteMode = true;
+    currentSeedHex = hashHex;
+
+    genBtn.disabled = false;
+    genBtn.textContent = prevLabel;
+    const kb = (sizeBytes/1024).toFixed(sizeBytes < 1024*100 ? 1 : 0);
+    worldInfo.textContent = `🌍 ${label} (${kb}KB) → ${levelCount} room${levelCount===1?'':'s'} · hash ${hashHex.slice(0,10)}…`;
+
+    loadLevelDef(levels[0]);
+    overlay.classList.add('hidden');
+    draw();
+  }
+
+  document.getElementById('genSeedBtn').onclick = () => {
+    const v = document.getElementById('seedInput').value.trim() || 'x-out';
+    startWorldFromBytes(new TextEncoder().encode(v), v);
+  };
+  document.getElementById('randSeedBtn').onclick = () => {
+    const v = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    document.getElementById('seedInput').value = v;
+    startWorldFromBytes(new TextEncoder().encode(v), v);
+  };
+  document.getElementById('loadFileBtn').onclick = () => {
+    document.getElementById('fileInput').click();
+  };
+  document.getElementById('fileInput').onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const buf = await f.arrayBuffer();
+    startWorldFromBytes(new Uint8Array(buf), f.name);
+  };
+
+  // ---------------------------------------------------------------
+  // INIT
+  // ---------------------------------------------------------------
+  parseLevel(0);
+  showTitleOverlay();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

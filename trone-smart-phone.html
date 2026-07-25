@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tron Virtual Phone Emulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #222 0, #050505 55%, #000 100%);
+      color: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .phone-frame {
+      width: 360px;
+      max-width: 95vw;
+      height: 720px;
+      max-height: 95vh;
+      border-radius: 32px;
+      background: #101010;
+      border: 2px solid #444;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .phone-notch {
+      width: 120px;
+      height: 18px;
+      background: #000;
+      border-radius: 0 0 20px 20px;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+    .status-bar {
+      height: 28px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #ccc;
+      background: linear-gradient(to bottom, #111, #050505);
+      z-index: 1;
+      position: relative;
+    }
+    .status-left {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #f90;
+    }
+    .status-dot.online {
+      background: #0f0;
+    }
+    .status-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .battery {
+      width: 18px;
+      height: 8px;
+      border-radius: 2px;
+      border: 1px solid #777;
+      position: relative;
+    }
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: 2px;
+      width: 2px;
+      height: 4px;
+      background: #777;
+      border-radius: 1px;
+    }
+    .battery-level {
+      height: 100%;
+      width: 70%;
+      background: linear-gradient(to right, #4caf50, #8bc34a);
+    }
+    .screen {
+      flex: 1;
+      background: radial-gradient(circle at top, #252525 0, #050505 50%, #000 100%);
+      padding: 32px 18px 18px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    .screen-inner {
+      flex: 1;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(145deg, rgba(255,255,255,0.02), rgba(0,0,0,0.7));
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(16px);
+    }
+    .boot-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      text-align: center;
+    }
+    .boot-logo {
+      font-size: 32px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #0ff;
+      text-shadow: 0 0 12px rgba(0,255,255,0.7);
+    }
+    .boot-sub {
+      font-size: 13px;
+      color: #aaa;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.15);
+      border-top-color: #0ff;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .home-screen {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      height: 100%;
+    }
+    .home-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .app-icon {
+      flex: 1;
+      min-height: 90px;
+      border-radius: 22px;
+      background: radial-gradient(circle at top, #1e88e5 0, #0d47a1 45%, #000 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, border 0.08s ease;
+    }
+    .app-icon.tron {
+      background: radial-gradient(circle at top, #00e5ff 0, #00bcd4 40%, #000 100%);
+    }
+    .app-icon.dialer {
+      background: radial-gradient(circle at top, #4caf50 0, #1b5e20 45%, #000 100%);
+    }
+    .app-icon.game {
+      background: radial-gradient(circle at top, #ff7043 0, #bf360c 45%, #000 100%);
+    }
+    .game-view {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+      min-height: 0;
+    }
+    .game-frame {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      border: 1px solid rgba(255,90,54,0.45);
+      border-radius: 14px;
+      background: #08090d;
+    }
+    .app-icon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 20px rgba(0,0,0,0.5);
+      border-color: rgba(0,255,255,0.5);
+    }
+    .app-icon-title {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #f5f5f5;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .app-icon-glyph {
+      font-size: 24px;
+    }
+    .vsim-card {
+      font-size: 11px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .vsim-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .vsim-label {
+      color: #aaa;
+    }
+    .vsim-value {
+      font-weight: 600;
+      color: #fefefe;
+    }
+    .vsim-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      border: 1px solid rgba(0,255,255,0.4);
+      color: #0ff;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .online-label {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .online-label-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #777;
+    }
+    .online-label-dot.online {
+      background: #0f0;
+    }
+    .footer-nav {
+      margin-top: auto;
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      padding-top: 10px;
+      font-size: 10px;
+      color: #888;
+    }
+    .footer-nav span {
+      cursor: default;
+    }
+    .footer-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.12);
+    }
+    .footer-dot.active {
+      background: #0ff;
+      border-color: rgba(0,255,255,0.8);
+    }
+    .view-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .view-title {
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #eee;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: #ccc;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn-ghost:hover {
+      border-color: rgba(0,255,255,0.7);
+      color: #0ff;
+    }
+    .dialer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+    }
+    .dialer-display {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.14);
+      min-height: 52px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+    .dialer-number {
+      font-size: 18px;
+      letter-spacing: 0.08em;
+    }
+    .dialer-status {
+      font-size: 11px;
+      color: #aaa;
+    }
+    .dialer-grid {
+      margin-top: 6px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .dialer-key {
+      height: 52px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: radial-gradient(circle at top, rgba(255,255,255,0.12), rgba(0,0,0,0.8));
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.06s ease, box-shadow 0.06s ease, border 0.06s ease;
+    }
+    .dialer-key-main {
+      font-size: 18px;
+      font-weight: 500;
+    }
+    .dialer-key-sub {
+      font-size: 9px;
+      color: #aaa;
+      margin-top: 2px;
+    }
+    .dialer-key.action {
+      background: radial-gradient(circle at top, #00e676, #00c853);
+      border-color: rgba(0, 255, 128, 0.7);
+      color: #000;
+    }
+    .dialer-key.action.hangup {
+      background: radial-gradient(circle at top, #ff5252, #d32f2f);
+      border-color: rgba(255, 82, 82, 0.7);
+      color: #fff;
+    }
+    .dialer-key:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      border-color: rgba(0,255,255,0.7);
+    }
+    .tron-view {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+    }
+    .tron-console {
+      flex: 1;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(0,255,255,0.3);
+      padding: 10px 10px 4px;
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-size: 11px;
+      color: #e0ffff;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .tron-input-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tron-input {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(0,0,0,0.6);
+      color: #f5f5f5;
+      font-size: 11px;
+      padding: 6px 10px;
+      outline: none;
+    }
+    .tron-input:focus {
+      border-color: rgba(0,255,255,0.8);
+    }
+    .btn-primary {
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #00e5ff, #00bcd4);
+      color: #000;
+      font-size: 11px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      filter: brightness(1.05);
+    }
+    .tiny {
+      font-size: 10px;
+      color: #aaa;
+    }
+    .settings-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .settings-input {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.5);
+      color: #eee;
+      font-size: 10px;
+      padding: 4px 8px;
+      outline: none;
+    }
+    .settings-input:focus {
+      border-color: rgba(0,255,255,0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <div class="phone-notch"></div>
+    <div class="status-bar">
+      <div class="status-left">
+        <span id="status-time"></span>
+        <span>TronNet</span>
+        <span id="status-online-dot" class="status-dot"></span>
+      </div>
+      <div class="status-right">
+        <span id="status-vsim-label"></span>
+        <div class="battery">
+          <div class="battery-level"></div>
+        </div>
+      </div>
+    </div>
+    <div class="screen">
+      <div class="screen-inner" id="screen-inner">
+        <!-- Content injected by JS -->
+      </div>
+      <div class="footer-nav">
+        <span><span class="footer-dot active"></span></span>
+        <span>Tron Virtual Phone</span>
+        <span><span class="footer-dot"></span></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== Core virtual phone state ======
+    const VSIM_KEY   = "tron_vsim_profile_v1";
+    const STATE_KEY  = "tron_virtual_phone_state_v1";
+    const IP_STATS_KEY = "#0.json";             // where we keep IP stats in localStorage
+    const DEFAULT_DIAL_NUMBER = "*999#";        // you can change to *1000#/etc in UI
+    const HOST_MAC  = "02:1A:6B:3C:9D:F0";
+
+    let appState = {
+      view: "boot",        // "boot" | "home" | "dialer" | "tron" | "game"
+      online: false,
+      dialNumber: DEFAULT_DIAL_NUMBER,
+      dialerEntry: "",
+      tronLog: [],
+    };
+
+    let tronSocket = null;
+
+    // ====== vSIM profile ======
+    function generateVSim() {
+      const randomHex = () => Math.floor(Math.random() * 0xffff)
+        .toString(16)
+        .padStart(4, "0");
+
+      const vsimId = `VSIM-${randomHex()}-${randomHex()}-${randomHex()}`;
+      // You can swap to +1000 / +1001 here if you want:
+      const phoneNumber = `+1000${Math.floor(100000000 + Math.random()*899999999)}`;
+      const createdAt = new Date().toISOString();
+      return {
+        id: vsimId,
+        msisdn: phoneNumber,
+        createdAt,
+        hostMac: HOST_MAC,
+        dialNumber: DEFAULT_DIAL_NUMBER,
+        notes: "Tron vSIM – saved on first boot",
+      };
+    }
+
+    function loadOrCreateVSim() {
+      const saved = localStorage.getItem(VSIM_KEY);
+      if (saved) {
+        try { return JSON.parse(saved); } catch (_) {}
+      }
+      const vsim = generateVSim();
+      localStorage.setItem(VSIM_KEY, JSON.stringify(vsim));
+      return vsim;
+    }
+
+    let vsimProfile = loadOrCreateVSim();
+
+    function persistState() {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        view: appState.view,
+        online: appState.online,
+        dialNumber: appState.dialNumber,
+      }));
+    }
+
+    function restoreState() {
+      const saved = localStorage.getItem(STATE_KEY);
+      if (!saved) return;
+      try {
+        const parsed = JSON.parse(saved);
+        appState.view = parsed.view || "home";
+        appState.online = !!parsed.online;
+        appState.dialNumber = parsed.dialNumber || DEFAULT_DIAL_NUMBER;
+      } catch (_) {}
+    }
+
+    // ====== Status bar ======
+    function setStatusBar() {
+      const timeEl = document.getElementById("status-time");
+      const dotEl = document.getElementById("status-online-dot");
+      const vsimLabel = document.getElementById("status-vsim-label");
+
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2, "0");
+      const mm = now.getMinutes().toString().padStart(2, "0");
+      timeEl.textContent = `${hh}:${mm}`;
+
+      if (appState.online) {
+        dotEl.classList.add("online");
+        vsimLabel.textContent = vsimProfile.msisdn || "vSIM";
+      } else {
+        dotEl.classList.remove("online");
+        vsimLabel.textContent = "Offline";
+      }
+    }
+
+    // ====== Tron console helper ======
+    function tronLogLine(line) {
+      appState.tronLog.push(line);
+      render();
+    }
+
+    // ====== Tron command parser (includes find/scan/cd/ls/curl) ======
+    function parseTronCommand(raw) {
+      const text = (raw || "").trim();
+      if (!text) return { type: "noop" };
+
+      const line = text.startsWith(">") ? text.slice(1).trim() : text;
+      const lower = line.toLowerCase();
+
+      // status
+      if (lower === "status" || lower.startsWith("show status")) {
+        return { type: "status" };
+      }
+      if (lower.startsWith("show dsim")) {
+        return { type: "status", target: "dsim" };
+      }
+
+      // dial (virtual, for gateway signalling)
+      if (lower.startsWith("dial ")) {
+        const num = line.split(/\s+/, 2)[1] || "";
+        return { type: "dial", number: num.trim() };
+      }
+
+      // send
+      if (lower.startsWith("send ")) {
+        let payload = line.slice(5).trim();
+        if (
+          (payload.startsWith('"') && payload.endsWith('"')) ||
+          (payload.startsWith("'") && payload.endsWith("'"))
+        ) {
+          payload = payload.slice(1, -1);
+        }
+        return { type: "send", payload };
+      }
+
+      // route
+      if (lower.startsWith("route ")) {
+        let via = null;
+        if (lower.includes("gateway")) via = "gateway";
+        else if (lower.includes("default")) via = "default";
+        return { type: "route", via };
+      }
+
+      // find
+      if (lower.startsWith("find ")) {
+        const query = line.slice(5).trim();
+        return { type: "find", query };
+      }
+
+      // scan
+      if (lower.startsWith("scan ")) {
+        const target = line.split(/\s+/, 2)[1] || "";
+        return { type: "scan", target: target.trim() };
+      }
+
+      // cd
+      if (lower.startsWith("cd ")) {
+        const path = line.slice(3).trim();
+        return { type: "cd", path };
+      }
+
+      // ls
+      if (lower === "ls" || lower.startsWith("ls ")) {
+        const maybePath = line.length > 2 ? line.slice(3).trim() : "";
+        return { type: "ls", path: maybePath || null };
+      }
+
+      // curl
+      if (lower.startsWith("curl ")) {
+        const parts = line.split(/\s+/);
+        let method = "GET";
+        let url = null;
+        let i = 1;
+        while (i < parts.length) {
+          const token = parts[i];
+          if (token.toUpperCase() === "-X" && i + 1 < parts.length) {
+            method = parts[i + 1].toUpperCase();
+            i += 2;
+            continue;
+          }
+          if (!url) {
+            url = token;
+          }
+          i++;
+        }
+        return { type: "curl", method, url };
+      }
+
+      // learn (for future AI hooks)
+      if (lower.startsWith("learn ")) {
+        const topic = detectLearnTopic(lower);
+        return { type: "learn", topic, raw: line };
+      }
+
+      // default: note
+      return { type: "note", raw: line };
+    }
+
+    function detectLearnTopic(lower) {
+      if (lower.includes("hash")) return "hash_resolve";
+      if (lower.includes("part of speech") || lower.includes("speech")) {
+        return "part_of_speech_resolve";
+      }
+      if (lower.includes("metadata")) return "metadata_model";
+      return "generic";
+    }
+
+    // ====== WebSocket / backend integration ======
+    function connectTronDaemon() {
+      try {
+        tronSocket = new WebSocket("ws://127.0.0.1:8765");
+      } catch (e) {
+        tronLogLine("[Tron] Could not open backend WebSocket.");
+        return;
+      }
+
+      tronSocket.onopen = () => {
+        tronLogLine("[Tron] Connected to backend daemon (ws://127.0.0.1:8765).");
+      };
+
+      tronSocket.onclose = () => {
+        tronLogLine("[Tron] Backend disconnected. Will retry…");
+        setTimeout(connectTronDaemon, 2500);
+      };
+
+      tronSocket.onerror = () => {
+        tronLogLine("[Tron] Backend error.");
+      };
+
+      tronSocket.onmessage = (evt) => {
+        let msg;
+        try {
+          msg = JSON.parse(evt.data);
+        } catch {
+          tronLogLine("[RX] " + evt.data);
+          return;
+        }
+        handleTronServerMessage(msg);
+      };
+    }
+
+    function tronSend(obj) {
+      if (!tronSocket || tronSocket.readyState !== WebSocket.OPEN) {
+        tronLogLine("[Tron] (offline) Cannot reach backend daemon.");
+        return;
+      }
+      tronSocket.send(JSON.stringify(obj));
+    }
+
+    function handleTronServerMessage(msg) {
+      if (msg.type === "status") {
+        tronLogLine(`[status] cwd=${msg.cwd || "?"}, ip_count=${msg.ip_count ?? "?"}`);
+      } else if (msg.type === "find_result") {
+        const r = msg.result || [];
+        tronLogLine(`[find] ${msg.query} -> ${r.length} result(s)`);
+        r.slice(0, 20).forEach(p => tronLogLine("  - " + p));
+        if (r.length > 20) tronLogLine("  … (truncated)");
+      } else if (msg.type === "scan_result") {
+        tronLogLine(`[scan] ${msg.target} (${msg.ip || "?"}) open: ${JSON.stringify(msg.open_ports || [])}`);
+      } else if (msg.type === "ls_result") {
+        tronLogLine(`[ls] ${msg.cwd || ""}`);
+        (msg.entries || []).forEach(e => tronLogLine("  " + e));
+      } else if (msg.type === "cd_result") {
+        tronLogLine("[cd] " + (msg.cwd || ""));
+      } else if (msg.type === "curl_result") {
+        tronLogLine(`[curl] ${msg.status_code} ${msg.url} (ip=${msg.ip || "?"})`);
+        if (msg.content_preview) {
+          tronLogLine("  " + msg.content_preview.replace(/\s+/g, " ").slice(0, 180) + "…");
+        }
+      } else if (msg.type === "send_ack") {
+        tronLogLine("[send] " + (msg.message || "ok"));
+      } else if (msg.type === "ip_stats") {
+        // save to localStorage as #0.json
+        const stats = msg.stats || {};
+        try {
+          localStorage.setItem(IP_STATS_KEY, JSON.stringify(stats, null, 2));
+          tronLogLine(`[Tron] IP stats updated → ${IP_STATS_KEY}`);
+        } catch {
+          tronLogLine("[Tron] Failed to write IP stats to localStorage.");
+        }
+      } else if (msg.type === "error") {
+        tronLogLine("[error] " + (msg.message || "unknown"));
+      } else if (msg.message) {
+        tronLogLine("[Tron] " + msg.message);
+      } else {
+        tronLogLine("[Tron] RX: " + JSON.stringify(msg));
+      }
+    }
+
+    // ====== Download #0.json ======
+    function downloadIpStats() {
+      const data = localStorage.getItem(IP_STATS_KEY);
+      if (!data) {
+        tronLogLine("[Tron] No IP stats in localStorage yet.");
+        return;
+      }
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = IP_STATS_KEY;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ====== Rendering ======
+    function render() {
+      const container = document.getElementById("screen-inner");
+      setStatusBar();
+
+      if (appState.view === "boot") {
+        container.innerHTML = `
+          <div class="boot-screen">
+            <div class="boot-logo">ANDROID</div>
+            <div class="boot-sub">Booting latest virtual image…</div>
+            <div class="spinner"></div>
+            <div class="tiny">Host MAC: ${vsimProfile.hostMac}</div>
+            <div class="tiny">vSIM: ${vsimProfile.id}</div>
+          </div>
+        `;
+        return;
+      }
+
+      if (appState.view === "home") {
+        container.innerHTML = `
+          <div class="home-screen">
+            <div class="home-row">
+              <div class="app-icon tron" onclick="openTron()">
+                <div class="app-icon-glyph">⚡</div>
+                <div class="app-icon-title">Tron</div>
+              </div>
+              <div class="app-icon dialer" onclick="openDialer()">
+                <div class="app-icon-glyph">📞</div>
+                <div class="app-icon-title">Dialer</div>
+              </div>
+              <div class="app-icon game" onclick="openGame()">
+                <div class="app-icon-glyph">🎮</div>
+                <div class="app-icon-title">Game</div>
+              </div>
+            </div>
+            <div class="vsim-card">
+              <div class="vsim-row">
+                <span class="vsim-label">vSIM ID</span>
+                <span class="vsim-value">${vsimProfile.id}</span>
+              </div>
+              <div class="vsim-row">
+                <span class="vsim-label">Number</span>
+                <span class="vsim-value">${vsimProfile.msisdn}</span>
+              </div>
+              <div class="vsim-row">
+                <span class="vsim-label">Host MAC</span>
+                <span class="vsim-value">${vsimProfile.hostMac}</span>
+              </div>
+              <div class="vsim-row">
+                <span class="vsim-label">Dial to go online</span>
+                <span class="vsim-value">${appState.dialNumber}</span>
+              </div>
+              <div class="vsim-row" style="margin-top:4px;">
+                <span class="vsim-badge">Tron dSIM</span>
+                <button class="online-label" onclick="toggleOnline()">
+                  <span class="online-label-dot ${appState.online ? "online" : ""}"></span>
+                  <span>${appState.online ? "Connected" : "Tap to go online"}</span>
+                </button>
+              </div>
+            </div>
+            <div>
+              <div class="tiny">First boot saved this vSIM profile locally in your browser (localStorage).</div>
+              <div class="settings-row">
+                <input
+                  id="dial-number-input"
+                  class="settings-input"
+                  type="text"
+                  value="${appState.dialNumber}"
+                  placeholder="Dial code to go online (e.g. *999#)"
+                />
+                <button class="btn-ghost" onclick="saveDialNumber()">Save</button>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (appState.view === "dialer") {
+        container.innerHTML = `
+          <div class="dialer">
+            <div class="view-header">
+              <span class="view-title">Tron Dialer</span>
+              <button class="btn-ghost" onclick="goHome()">Home</button>
+            </div>
+            <div class="dialer-display">
+              <div class="dialer-number">${appState.dialerEntry || "&nbsp;"}</div>
+              <div class="dialer-status">
+                ${appState.online
+                  ? "Online via " + appState.dialNumber
+                  : "Offline · dial your TronNet number to connect"}
+              </div>
+            </div>
+            <div class="dialer-grid">
+              ${renderDialKey("1", "")}
+              ${renderDialKey("2", "ABC")}
+              ${renderDialKey("3", "DEF")}
+              ${renderDialKey("4", "GHI")}
+              ${renderDialKey("5", "JKL")}
+              ${renderDialKey("6", "MNO")}
+              ${renderDialKey("7", "PQRS")}
+              ${renderDialKey("8", "TUV")}
+              ${renderDialKey("9", "WXYZ")}
+              ${renderDialKey(".", "IP")}
+              ${renderDialKey("0", "+")}
+              ${renderDialKey("=", "Logic")}
+            </div>
+            <div class="dialer-grid">
+              <div class="dialer-key" onclick="backspaceDialer()">
+                <div class="dialer-key-main">⌫</div>
+                <div class="dialer-key-sub">Clear</div>
+              </div>
+              <div class="dialer-key action" onclick="dialCurrent()">
+                <div class="dialer-key-main">●</div>
+                <div class="dialer-key-sub">Dial / Go Online</div>
+              </div>
+              <div class="dialer-key action hangup" onclick="hangup()">
+                <div class="dialer-key-main">■</div>
+                <div class="dialer-key-sub">Hang up</div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (appState.view === "game") {
+        container.innerHTML = `
+          <div class="game-view">
+            <div class="view-header">
+              <span class="view-title">X OUT</span>
+              <button class="btn-ghost" onclick="goHome()">Home</button>
+            </div>
+            <iframe
+              class="game-frame"
+              src="x-out.html"
+              title="X OUT procedural hash game"
+              allow="gamepad"
+            ></iframe>
+            <div class="tiny">
+              A file, typed seed, or hash can generate a deterministic playable world.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (appState.view === "tron") {
+        const logText = appState.tronLog.join("\n");
+        container.innerHTML = `
+          <div class="tron-view">
+            <div class="view-header">
+              <span class="view-title">Tron Shell</span>
+              <button class="btn-ghost" onclick="goHome()">Home</button>
+            </div>
+            <div class="tron-console" id="tron-console">
+$ tron@virtual-host
+$ dsim.id       = ${vsimProfile.id}
+$ dsim.msisdn   = ${vsimProfile.msisdn}
+$ dsim.host_mac = ${vsimProfile.hostMac}
+$ net.status    = ${appState.online ? "ONLINE" : "OFFLINE"}
+$ net.dial_code = ${appState.dialNumber}
+$
+${logText || "# Type a command: find / scan / cd / ls / curl / status / learn …"}
+            </div>
+            <div class="tron-input-row">
+              <input id="tron-input" class="tron-input" type="text" placeholder="Tron command or note…" />
+              <button class="btn-primary" onclick="sendTronCommand()">SEND</button>
+            </div>
+            <div class="tron-input-row" style="margin-top:4px;">
+              <button class="btn-ghost" onclick="downloadIpStats()">Download IP Stats (#0.json)</button>
+            </div>
+            <div class="tiny">
+              This is a virtual shell for the Tron app. Run the TronNet daemon on ws://127.0.0.1:8765
+              to make find/scan/ls/curl and IP logging live.
+            </div>
+          </div>
+        `;
+        setTimeout(() => {
+          const input = document.getElementById("tron-input");
+          if (input) input.focus();
+          const c = document.getElementById("tron-console");
+          if (c) c.scrollTop = c.scrollHeight;
+        }, 0);
+        return;
+      }
+    }
+
+    function renderDialKey(main, sub) {
+      return `
+        <div class="dialer-key" onclick="pressDialKey('${main}')">
+          <div class="dialer-key-main">${main}</div>
+          <div class="dialer-key-sub">${sub}</div>
+        </div>
+      `;
+    }
+
+    // ====== Navigation ======
+    function goHome() {
+      appState.view = "home";
+      persistState();
+      render();
+    }
+    function openDialer() {
+      appState.view = "dialer";
+      persistState();
+      render();
+    }
+    function openTron() {
+      appState.view = "tron";
+      persistState();
+      render();
+    }
+    function openGame() {
+      appState.view = "game";
+      persistState();
+      render();
+    }
+
+    // ====== Online toggle + dial number ======
+    function toggleOnline() {
+      appState.online = !appState.online;
+      persistState();
+      render();
+    }
+
+    function saveDialNumber() {
+      const input = document.getElementById("dial-number-input");
+      if (!input) return;
+      const value = (input.value || "").trim();
+      if (!value) return;
+      appState.dialNumber = value;
+      vsimProfile.dialNumber = value;
+      localStorage.setItem(VSIM_KEY, JSON.stringify(vsimProfile));
+      persistState();
+      render();
+    }
+
+    // ====== Dialer behavior ======
+    function pressDialKey(key) {
+      appState.dialerEntry += key;
+      render();
+    }
+
+    function backspaceDialer() {
+      appState.dialerEntry = appState.dialerEntry.slice(0, -1);
+      render();
+    }
+
+    function dialCurrent() {
+      const number = appState.dialerEntry.trim();
+      if (!number) {
+        appState.dialerEntry = appState.dialNumber;
+        render();
+        return;
+      }
+      if (number === appState.dialNumber) {
+        appState.online = true;
+      }
+      render();
+    }
+
+    function hangup() {
+      appState.online = false;
+      appState.dialerEntry = "";
+      render();
+    }
+
+    // ====== Tron shell entrypoint ======
+    function sendTronCommand() {
+      const input = document.getElementById("tron-input");
+      if (!input) return;
+      const text = (input.value || "").trim();
+      if (!text) return;
+
+      tronLogLine("> " + text);
+      const cmd = parseTronCommand(text);
+
+      // Local quick responses for basic stuff
+      if (cmd.type === "note") {
+        if (/vsim|sim/i.test(cmd.raw)) {
+          tronLogLine(`  vSIM: ${vsimProfile.id} (${vsimProfile.msisdn})`);
+        } else if (/online|status/i.test(cmd.raw)) {
+          tronLogLine(`  net: ${appState.online ? "ONLINE via " + appState.dialNumber : "OFFLINE"}`);
+        } else {
+          tronLogLine("  [Tron] Noted.");
+        }
+      } else if (cmd.type === "noop") {
+        // nothing
+      } else {
+        // Forward to backend daemon where appropriate
+        if (["status","find","scan","cd","ls","curl","send","dial","route","learn"].includes(cmd.type)) {
+          const payload = { type: cmd.type };
+          Object.assign(payload, cmd); // include fields like query, url, etc.
+          tronSend(payload);
+        } else {
+          tronLogLine("[Tron] Unknown command type: " + cmd.type);
+        }
+      }
+
+      input.value = "";
+    }
+
+    // ====== Init ======
+    function init() {
+      restoreState();
+      setStatusBar();
+      render();
+
+      setTimeout(() => {
+        if (appState.view === "boot") {
+          appState.view = "home";
+          persistState();
+          render();
+        }
+      }, 2000);
+
+      setInterval(setStatusBar, 20000);
+      connectTronDaemon();
+    }
+
+    // Expose functions for onclick bindings
+    window.goHome = goHome;
+    window.openDialer = openDialer;
+    window.openTron = openTron;
+    window.openGame = openGame;
+    window.toggleOnline = toggleOnline;
+    window.saveDialNumber = saveDialNumber;
+    window.pressDialKey = pressDialKey;
+    window.backspaceDialer = backspaceDialer;
+    window.dialCurrent = dialCurrent;
+    window.hangup = hangup;
+    window.sendTronCommand = sendTronCommand;
+    window.downloadIpStats = downloadIpStats;
+
+    init();
+  </script>
+</body>
+</html>
